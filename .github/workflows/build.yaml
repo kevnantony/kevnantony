@@ -52,6 +52,8 @@ jobs:
           echo "No changes to commit"
         else
           git commit -m "Update README"
+          # Another run may have pushed meanwhile; replay this commit on top.
+          git pull --rebase -X theirs origin main
           git push
         fi
 
