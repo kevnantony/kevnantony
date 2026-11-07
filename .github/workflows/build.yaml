@@ -2,22 +2,34 @@ name: Start Workflow
 
 on:
   schedule:
-    - cron: '0 */24 * * *'
+    - cron: '17 2 * * *'
   workflow_dispatch:
   push:
     branches: [ main ]
-    
+    paths-ignore:
+      - 'README.md'
+      - 'out/**'
+
+permissions:
+  contents: write   # commit the regenerated README/image
+  actions: write    # keepalive: re-enable this workflow so it is never auto-disabled
+
+concurrency:
+  group: readme-refresh
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Setup Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.10'
+        python-version: '3.12'
+        cache: pip
 
     - name: Install dependencies
       run: |
@@ -26,15 +38,27 @@ jobs:
 
     - name: Run update script
       env:
-        GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        # The built-in token is enough for public profile data and never expires.
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_USER: ${{ github.repository_owner }}
       run: python main.py
 
     - name: Commit and push changes
-      env:
-        GH_TOKEN: ${{ secrets.GH_TOKEN }}
       run: |
-        git config --global user.name 'GitHub Actions'
-        git config --global user.email 'actions@github.com'
+        git config user.name 'github-actions[bot]'
+        git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
         git add README.md out/fetch.png
-        git diff --quiet && git diff --staged --quiet || git commit -m "Update README"
-        git push https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }}.git
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "Update README"
+          git push
+        fi
+
+    - name: Keep scheduled workflow alive
+      # GitHub disables scheduled workflows after 60 days without repo activity.
+      # Re-enabling via the API resets that timer even when nothing changed.
+      if: github.event_name == 'schedule'
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/build.yaml/enable"

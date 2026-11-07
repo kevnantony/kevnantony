@@ -4,15 +4,20 @@ from dotenv import load_dotenv
 from github import Github
 from collections import Counter
 
-with open("config.json", "r") as f:
-    config = json.load(f)
-
 with open('config.json') as config_file:
     config = json.load(config_file)
 
+def get_target_user(g: Github):
+    # GH_USER lets the script run with the workflow's GITHUB_TOKEN, which cannot
+    # call /user. Without it, fall back to the token owner (personal token).
+    login = os.getenv("GH_USER")
+    return g.get_user(login) if login else g.get_user()
+
 def get_repos(g: Github):
     exclude_organizations = config.get("exclude_organizations", True)
-    repos = [repo for repo in g.get_user().get_repos(type="public") if repo.visibility == "public"]
+    user = get_target_user(g)
+    repo_type = "owner" if os.getenv("GH_USER") else "public"
+    repos = [repo for repo in user.get_repos(type=repo_type) if repo.visibility == "public"]
     if exclude_organizations:
         repos = [repo for repo in repos if repo.owner.type != "Organization"]
     return repos
@@ -47,7 +52,7 @@ def format_languages(languages: dict) -> str:
     return '\n' + '\n'.join([f"- {lang}: {bytes_count} bytes of code" for lang, bytes_count in sorted_lang]) # The GitHUB API returns the bytes of code written in a language, not the lines of code
 
 def fetch_stats(g: Github) -> dict:
-    user = g.get_user()
+    user = get_target_user(g)
     total_commits = 0
     total_issues = 0
     total_prs = 0

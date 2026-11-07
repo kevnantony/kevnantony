@@ -23,5 +23,5 @@
     "preferred_color": "lightblue",
     "max_languages": 5,
     "append_automatic": true,
-    "exclude_orgainzations": true
+    "exclude_organizations": true
 }

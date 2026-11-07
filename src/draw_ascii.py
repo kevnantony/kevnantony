@@ -2,7 +2,7 @@ import requests
 from github import Github
 from PIL import Image
 from io import BytesIO
-from src.fetch_info import fetch_stats
+from src.fetch_info import fetch_stats, get_target_user
 
 def get_ascii_char(pixel):
     ascii_chars = '.:-=+*#%@'
@@ -27,8 +27,9 @@ def image_to_ascii(image, width=50) -> str:
     return ascii_str
 
 def generate_logo(g:Github) -> str:
-    user_pfp = g.get_user().avatar_url
-    response = requests.get(user_pfp)
+    user_pfp = get_target_user(g).avatar_url
+    response = requests.get(user_pfp, timeout=30)
+    response.raise_for_status()
     img = Image.open(BytesIO(response.content))
 
     return image_to_ascii(img)
